@@ -100,6 +100,87 @@ class ResearchEngine:
             discarded_claim_count,
         )
 
+
+    @staticmethod
+    def _calculate_quality_score(synthesis):
+        """
+        Calculate an evidence-match score across all validated claims.
+        This measures evidence matching, not factual truth.
+        """
+
+        sections = [
+            "key_findings",
+            "patterns",
+            "contradictions",
+            "opportunities",
+        ]
+
+        weights = {
+            "supported": 1.0,
+            "partially_supported": 0.5,
+            "unverified": 0.0,
+            "not_checked": 0.0,
+        }
+
+        counts = {
+            "supported": 0,
+            "partially_supported": 0,
+            "unverified": 0,
+            "not_checked": 0,
+        }
+
+        total_claims = 0
+        weighted_points = 0.0
+
+        for section in sections:
+            claims = synthesis.get(section, [])
+
+            if not isinstance(claims, list):
+                continue
+
+            for item in claims:
+                if not isinstance(item, dict):
+                    continue
+
+                total_claims += 1
+
+                verification = item.get("verification", {})
+                status = verification.get(
+                    "verification_status",
+                    "not_checked",
+                )
+
+                if status not in weights:
+                    status = "not_checked"
+
+                counts[status] += 1
+                weighted_points += weights[status]
+
+        score = (
+            (weighted_points / total_claims) * 100
+            if total_claims > 0
+            else 0.0
+        )
+
+        checked_claims = (
+            counts["supported"]
+            + counts["partially_supported"]
+            + counts["unverified"]
+        )
+
+        return {
+            "score": round(score, 2),
+            "total_claims": total_claims,
+            "checked_claims": checked_claims,
+            "verification_coverage": round(
+                (checked_claims / total_claims) * 100,
+                2,
+            ) if total_claims else 0.0,
+            "status_counts": counts,
+            "score_type": "evidence_match_not_truth_probability",
+        }
+
+
     async def run(self, request: ResearchRequest) -> ResearchResponse:
         try:
             # STEP 1 — SEARCH
@@ -335,6 +416,13 @@ class ResearchEngine:
                         "citation_validation": {},
                         "error": synthesis_result.get("error"),
                     }
+            
+            quality_details = self._calculate_quality_score(
+                synthesis
+            )
+
+            quality_score = quality_details["score"]
+
 
             # STEP 5 — FINAL RESPONSE
             final_summary = base_summary
@@ -355,6 +443,8 @@ class ResearchEngine:
                 analysis=analysis,
                 synthesis=synthesis,
                 error=None,
+                quality_score=quality_score,
+                quality_details=quality_details,
             )
 
         except Exception as error:
