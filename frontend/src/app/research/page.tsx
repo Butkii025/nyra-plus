@@ -8,7 +8,7 @@ import {
   FileText, Lightbulb, ChevronDown, Loader2, AlertCircle,
   ExternalLink, KeyRound, BarChart3, CheckCircle2, ShieldCheck,
 } from "lucide-react";
-
+import ResearchQualityCard from "@/components/research/ResearchQualityCard";
 const suggestions = [
   "Why are AI agents trending right now?",
   "Emerging technologies in healthcare",
@@ -68,6 +68,7 @@ interface ResearchSynthesis {
   error?: string | null;
 }
 
+
 interface ResearchResult {
   status: string;
   query: string;
@@ -77,8 +78,23 @@ interface ResearchResult {
   sources?: ResearchSource[];
   analysis?: ResearchAnalysis;
   synthesis?: ResearchSynthesis;
+  quality_score?: number;
+  quality_details?: {
+    score: number;
+    total_claims: number;
+    checked_claims: number;
+    verification_coverage: number;
+    status_counts: {
+      supported: number;
+      partially_supported: number;
+      unverified: number;
+      not_checked: number;
+    };
+    score_type: string;
+  };
   error?: string | null;
 }
+
 
 export default function ResearchPage() {
   const [topic, setTopic] = useState("");
@@ -533,6 +549,14 @@ function ResearchResults({ result }: { result: ResearchResult }) {
             independently prove that a source fully supports a claim.
           </p>
         </ResultSection>
+      )}
+
+       {/* Research Quality Score */}
+      {aiReady && result.quality_details && (
+        <ResearchQualityCard
+          qualityScore={result.quality_score}
+          qualityDetails={result.quality_details}
+        />
       )}
 
       {/* Key Findings */}
